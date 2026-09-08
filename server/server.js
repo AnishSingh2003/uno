@@ -28,9 +28,9 @@ const COLORS = [
 
 const DRAW_AMOUNT = {
   draw2: 2,
-  wild4: 10,
+  wild4: 4,
   wild6: 6,
-  wild10: 4
+  wild10: 10
 };
 
 // --------------------
