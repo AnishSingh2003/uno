@@ -6,7 +6,7 @@ import React, {
 import { io } from "socket.io-client";
 
 const socket = io(
-  "http://localhost:3001"
+  "https://uno-rcao.onrender.com"
 );
 
 const COLORS = [
