@@ -206,7 +206,9 @@ function createRoom(
 
     sevenMode: false,
 
-    colorDrawMode: false
+    colorDrawMode: false,
+
+    winner: null
   };
 }
 
@@ -400,6 +402,39 @@ function canPlay(
 }
 
 // --------------------
+// Winner
+// --------------------
+
+function checkWinner(room) {
+  const winner = room.players.find(
+    (player) => player.hand.length === 0
+  );
+
+  if (!winner) {
+    return false;
+  }
+
+  room.winner = {
+    id: winner.id,
+    name: winner.name
+  };
+
+  room.status = "finished";
+  room.sevenMode = false;
+  room.colorDrawMode = false;
+  room.pendingDraw = 0;
+
+  io.to(room.roomId).emit(
+    "message",
+    {
+      text: `🏆 ${winner.name} won the game!`
+    }
+  );
+
+  return true;
+}
+
+// --------------------
 // Elimination
 // --------------------
 
@@ -482,14 +517,7 @@ function sendRoom(room) {
     topCard:
       getTopCard(room),
 
-    winner:
-      room.status === "finished" &&
-      room.players.length === 1
-        ? {
-            id: room.players[0].id,
-            name: room.players[0].name
-          }
-        : null
+    winner: room.winner
   };
 
   // Public room information
@@ -536,6 +564,8 @@ function startGame(room) {
   room.sevenMode = false;
 
   room.colorDrawMode = false;
+
+  room.winner = null;
 
   // 7 cards each
   for (const player of room.players) {
@@ -876,6 +906,11 @@ io.on(
           room.currentColor =
             chosenColor;
 
+          if (checkWinner(room)) {
+            sendRoom(room);
+            return;
+          }
+
           nextPlayer(room);
         }
 
@@ -897,6 +932,11 @@ io.on(
 
           room.pendingDraw +=
             DRAW_AMOUNT.wild4;
+
+          if (checkWinner(room)) {
+            sendRoom(room);
+            return;
+          }
 
           nextPlayer(room);
         }
@@ -920,6 +960,11 @@ io.on(
           room.pendingDraw +=
             DRAW_AMOUNT.wild6;
 
+          if (checkWinner(room)) {
+            sendRoom(room);
+            return;
+          }
+
           nextPlayer(room);
         }
 
@@ -942,6 +987,11 @@ io.on(
           room.pendingDraw +=
             DRAW_AMOUNT.wild10;
 
+          if (checkWinner(room)) {
+            sendRoom(room);
+            return;
+          }
+
           nextPlayer(room);
         }
 
@@ -963,6 +1013,11 @@ io.on(
           room.pendingDraw +=
             DRAW_AMOUNT.draw2;
 
+          if (checkWinner(room)) {
+            sendRoom(room);
+            return;
+          }
+
           nextPlayer(room);
         }
 
@@ -980,6 +1035,11 @@ io.on(
 
           room.currentColor =
             card.color;
+
+          if (checkWinner(room)) {
+            sendRoom(room);
+            return;
+          }
 
           nextPlayer(
             room,
@@ -1003,6 +1063,11 @@ io.on(
             card.color;
 
           room.direction *= -1;
+
+          if (checkWinner(room)) {
+            sendRoom(room);
+            return;
+          }
 
           if (
             room.players.length ===
@@ -1031,6 +1096,11 @@ io.on(
 
           room.currentColor =
             card.color;
+
+          if (checkWinner(room)) {
+            sendRoom(room);
+            return;
+          }
 
           room.sevenMode =
             true;
@@ -1066,7 +1136,6 @@ io.on(
                 card.color
             );
 
-          // Played card must remain top
           room.discardPile.push(
             ...sameColorCards
           );
@@ -1077,6 +1146,11 @@ io.on(
 
           room.currentColor =
             card.color;
+
+          if (checkWinner(room)) {
+            sendRoom(room);
+            return;
+          }
 
           nextPlayer(room);
         }
@@ -1095,6 +1169,11 @@ io.on(
 
           room.currentColor =
             null;
+
+          if (checkWinner(room)) {
+            sendRoom(room);
+            return;
+          }
 
           room.colorDrawMode =
             true;
@@ -1128,6 +1207,11 @@ io.on(
 
           room.currentColor =
             card.color;
+
+          if (checkWinner(room)) {
+            sendRoom(room);
+            return;
+          }
 
           nextPlayer(room);
         }
@@ -1215,18 +1299,15 @@ io.on(
 
         checkElimination(room);
 
+        if (room.status === "finished") {
+          sendRoom(room);
+          return;
+        }
+
         if (
           room.players.length > 1
         ) {
           nextPlayer(room);
-        }
-
-        if (
-          room.players.length ===
-          1
-        ) {
-          room.status =
-            "finished";
         }
 
         sendRoom(room);
@@ -1295,6 +1376,11 @@ io.on(
         room.sevenMode =
           false;
 
+        if (checkWinner(room)) {
+          sendRoom(room);
+          return;
+        }
+
         nextPlayer(room);
 
         checkElimination(room);
@@ -1355,18 +1441,16 @@ io.on(
         checkElimination(room);
 
         if (
-          room.players.length > 1
-        ) {
-          nextPlayer(room);
-        }
-
-        if (
-          room.players.length ===
-          1
+          room.players.length <= 1
         ) {
           room.status =
             "finished";
+
+          sendRoom(room);
+          return;
         }
+
+        nextPlayer(room);
 
         sendRoom(room);
       }
@@ -1495,6 +1579,7 @@ function leaveRoom(socket) {
   room.sevenMode = false;
   room.colorDrawMode = false;
   room.pendingDraw = 0;
+  room.winner = null;
 
   // Less than 2 players
   if (
